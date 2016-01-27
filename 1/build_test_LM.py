@@ -91,9 +91,10 @@ class LanguagePredictor(object):
         
         result = max(prediction_dict.keys(), key=(
             lambda lang: prediction_dict[lang]))
-        #print(prediction_dict[result])
+
         if prediction_dict[result] == 0:
             return 'other'
+
         return result
 
 
@@ -174,7 +175,6 @@ def build_LM(input_file_b, tokenizer):
 def main(input_file_b, input_file_t, output_file):
     tokenizer = CharacterTokenizer(ngram=4)
     language_models = build_LM(input_file_b, tokenizer)
-    print(language_models)
     predictor = LanguagePredictor(language_models, tokenizer)
 
     with open(input_file_t) as f:

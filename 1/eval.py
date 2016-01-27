@@ -8,7 +8,7 @@ and a file containing the correct results.
 """
 
 if len(sys.argv) != 3:
-    print "usage: " + sys.argv[0] + " file-containing-your-results file-containing-correct-results"
+    print("usage: " + sys.argv[0] + " file-containing-your-results file-containing-correct-results")
     sys.exit(2)
 
 correct = 0
@@ -26,4 +26,4 @@ fh1.close()
 fh2.close()
 
 acc = correct * 100.0 / cnt
-print "accuracy: %s / %s (%s%%)" % (correct, cnt, round(acc, 2))
+print("accuracy: %s / %s (%s%%)" % (correct, cnt, round(acc, 2)))

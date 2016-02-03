@@ -96,16 +96,22 @@ class LanguagePredictor(object):
         tokens = self.tokenizer.tokenize(sentence)
 
         # For each token, it will sum the total count
+        rogue_token_count = 0
         for token in tokens:
             most_used_lang = max(
                     self._language_model_dict,
                     key=lambda lang: self._language_model_dict[lang][token])
-            if (self._language_model_dict[most_used_lang][token] > 1):
+            # If token in the most commonly used language is not 1
+            if (self._language_model_dict[most_used_lang][token] > self._language_model_dict[most_used_lang].smooth_value):
                 for lang, lang_model in self._language_model_dict.items():
-                # Do the computation in log because of the small floating point
+
+                    # Do the log because of the small floating point
                     prediction_dict[lang] += math.log(lang_model[token])
                     prediction_dict[lang] -= math.log(lang_model.token_count)
-        
+            else:
+                rogue_token_count += 1
+
+        valid_token_count = len(tokens) - rogue_token_count
 
         # [(lang1, 0.01), (lang2, 0.005), ...]
         pred = list(map(
@@ -117,14 +123,11 @@ class LanguagePredictor(object):
         # Get the Highest prediction
         result = max(pred, key=(lambda x: x[1]))
 
-        # Unknown language when probability is 0
-        if result[1] == 0:
+        # Unknown language when zero probability or too much rogue token
+        if result[1] == 0 or rogue_token_count > valid_token_count:
             predicted_language = 'other'
         else:
             predicted_language = result[0]
-
-        #print(sentence)
-        #print(LanguagePredictor.prediction_index, predicted_language, pred)
 
         # simple counter for debugging purpose
         LanguagePredictor.prediction_index+=1
@@ -237,7 +240,7 @@ def test_LM(in_file, out_file, lm, tokenizer=CharacterTokenizer(ngram=4)):
 
 def main(input_file_b, input_file_t, output_file):
     """Train and Predict the language"""
-    tokenizer = CharacterTokenizer(ngram=4, pad=False)
+    tokenizer = CharacterTokenizer(ngram=4, pad=True)
     #tokenizer = WordTokenizer()
     language_models = build_LM(input_file_b, tokenizer)
     test_LM(input_file_t, output_file, language_models, tokenizer)

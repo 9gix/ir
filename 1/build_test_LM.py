@@ -44,8 +44,9 @@ class WordTokenizer(Tokenizer):
         return sentence.strip().split()
 
 class CharacterTokenizer(Tokenizer):
-    def __init__(self, ngram=4):
+    def __init__(self, ngram=4, pad=False):
         self.ngram = ngram
+        self.pad = pad
 
     def replace_digits(self, sentence, digits_representation='0'):
         """replace all digits into `0`, 
@@ -61,14 +62,14 @@ class CharacterTokenizer(Tokenizer):
         @pad_size the amount of character padded"""
         return pad_char * pad_size + sentence + pad_char * pad_size
 
-    def tokenize(self, sentence, pad=True):
+    def tokenize(self, sentence):
         """N-gram tokenization method
         @sentence the line will be tokenize into char of ngram
         @pad will create add null character on the left and right.
         """
         sentence = self.normalize_spaces(sentence)
         sentence = self.replace_digits(sentence)
-        if pad:
+        if self.pad:
             sentence = self._pad(sentence.lower(), self.ngram-1)
         token_list = []
         for i in range(0, len(sentence) - (self.ngram-1)):
@@ -92,19 +93,18 @@ class LanguagePredictor(object):
         for lang in self._language_model_dict.keys():
             prediction_dict[lang] = 0
 
+        tokens = self.tokenizer.tokenize(sentence)
+
         # For each token, it will sum the total count
-        for lang in self._language_model_dict.keys():
-            tokens = self.tokenizer.tokenize(sentence)
-
-            # Do the computation in log because of the small floating point
-            prediction_dict[lang] = math.fsum(
-                math.log(self._language_model_dict[lang][token])
-                for token in tokens)
-
-            prediction_dict[lang] -= sum([
-                    math.log(self._language_model_dict[lang].token_count)
-                ] * len(tokens))
-
+        for token in tokens:
+            most_used_lang = max(
+                    self._language_model_dict,
+                    key=lambda lang: self._language_model_dict[lang][token])
+            if (self._language_model_dict[most_used_lang][token] > 1):
+                for lang, lang_model in self._language_model_dict.items():
+                # Do the computation in log because of the small floating point
+                    prediction_dict[lang] += math.log(lang_model[token])
+                    prediction_dict[lang] -= math.log(lang_model.token_count)
         
 
         # [(lang1, 0.01), (lang2, 0.005), ...]
@@ -237,8 +237,8 @@ def test_LM(in_file, out_file, lm, tokenizer=CharacterTokenizer(ngram=4)):
 
 def main(input_file_b, input_file_t, output_file):
     """Train and Predict the language"""
-    tokenizer = CharacterTokenizer(ngram=4)
-    # tokenizer = WordTokenizer()
+    tokenizer = CharacterTokenizer(ngram=4, pad=False)
+    #tokenizer = WordTokenizer()
     language_models = build_LM(input_file_b, tokenizer)
     test_LM(input_file_t, output_file, language_models, tokenizer)
 

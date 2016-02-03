@@ -48,12 +48,12 @@ class CharacterTokenizer(Tokenizer):
         self.ngram = ngram
         self.pad = pad
 
-    def replace_digits(self, sentence, digits_representation='0'):
+    def _replace_digits(self, sentence, digits_representation='0'):
         """replace all digits into `0`, 
         so we can treat any `0` as any number"""
         return re.sub(r'\d+', digits_representation, sentence)
 
-    def normalize_spaces(self, sentence):
+    def _normalize_spaces(self, sentence):
         """remove redundant white spaces"""
         return ' '.join(sentence.strip().split())
 
@@ -62,13 +62,17 @@ class CharacterTokenizer(Tokenizer):
         @pad_size the amount of character padded"""
         return pad_char * pad_size + sentence + pad_char * pad_size
 
+    def _strip_punctuation(self, sentence):
+        return re.sub(r'[^a-zA-Z0-9\s]', '', sentence)
+
     def tokenize(self, sentence):
         """N-gram tokenization method
         @sentence the line will be tokenize into char of ngram
         @pad will create add null character on the left and right.
         """
-        sentence = self.normalize_spaces(sentence)
-        sentence = self.replace_digits(sentence)
+        sentence = self._normalize_spaces(sentence)
+        sentence = self._strip_punctuation(sentence)
+        sentence = self._replace_digits(sentence)
         if self.pad:
             sentence = self._pad(sentence.lower(), self.ngram-1)
         token_list = []
@@ -122,6 +126,8 @@ class LanguagePredictor(object):
 
         # Get the Highest prediction
         result = max(pred, key=(lambda x: x[1]))
+        # Princ prediction score
+        # print(result[1])
 
         # Unknown language when zero probability or too much rogue token
         if result[1] == 0 or rogue_token_count > valid_token_count:

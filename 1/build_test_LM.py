@@ -4,6 +4,8 @@ import nltk
 import sys
 import getopt
 import argparse
+import pprint
+import math
 
 
 """
@@ -26,42 +28,46 @@ Language Model Data Structure:
 
 """
 
-    
-def test_LM(in_file, out_file, lm):
-    """
-    test the language models on new URLs
-    each line of in_file contains an URL
-    you should print the most probable label for each URL into out_file
-    """
-    print("testing language models...")
-    # This is an empty method
-    # Pls implement your code in below
-    test_data = []
-    with open(in_file) as f:
-        for line in f:
-            test_data.append({
-                'sentence': line,
-            })
-
-    for data in test_data:
-        data['predicted'] = lm.predict(line)
-
-    with open(out_file, 'w') as f:
-        for data in test_data:
-            print(data)
-            f.write("{predicted} {sentence}\n".format(**data))
-
 class Tokenizer(object):
-    pass
+    """Base class for all tokenizer type,
+    Any child class must implement tokenize method
+    """
+    def tokenize(self, sentence):
+        """
+        @sentence the line will be tokenize
+        """
+        raise NotImplementedError()
 
 class WordTokenizer(Tokenizer):
-    pass
+    def tokenize(self, sentence):
+        """Tokenize word by splitting any whitespace"""
+        return sentence.strip().split()
 
 class CharacterTokenizer(Tokenizer):
     def __init__(self, ngram=4):
         self.ngram = ngram
 
+    def replace_digits(self, sentence, digits_representation='0'):
+        """replace all digits into `0`, 
+        so we can treat any `0` as any number"""
+        return re.sub(r'\d+', digits_representation, sentence)
+
+    def normalize_spaces(self, sentence):
+        """remove redundant white spaces"""
+        return ' '.join(sentence.strip().split())
+
+    def _pad(self, sentence, pad_size, pad_char='\0'):
+        """Pad left and right most with `\0` (null character),
+        @pad_size the amount of character padded"""
+        return pad_char * pad_size + sentence + pad_char * pad_size
+
     def tokenize(self, sentence, pad=True):
+        """N-gram tokenization method
+        @sentence the line will be tokenize into char of ngram
+        @pad will create add null character on the left and right.
+        """
+        sentence = self.normalize_spaces(sentence)
+        sentence = self.replace_digits(sentence)
         if pad:
             sentence = self._pad(sentence.lower(), self.ngram-1)
         token_list = []
@@ -69,38 +75,56 @@ class CharacterTokenizer(Tokenizer):
             token_list.append(sentence[i:i+self.ngram])
         return token_list
 
-    def _pad(self, sentence, pad_size, pad_char='\0'):
-        return pad_char * pad_size + sentence + pad_char * pad_size
-
 
 class LanguagePredictor(object):
-    def __init__(self, language_model_table, tokenizer):
-        self._language_model_dict = language_model_table
+    """Predictor handles the prediction based on the language model given"""
+
+    # static counter for debugging purpose
+    prediction_index = 1
+    def __init__(self, language_model_dict, tokenizer):
+        self._language_model_dict = language_model_dict
         self.tokenizer = tokenizer
 
     def predict(self, sentence):
+        """Predict the probability of a sentence
+        based on the language model registered"""
         prediction_dict = {}
         for lang in self._language_model_dict.keys():
-            prediction_dict[lang] = 1
+            prediction_dict[lang] = 0
 
+        # For each token, it will sum the total count
         for token in self.tokenizer.tokenize(sentence):
             for lang in self._language_model_dict.keys():
-                prediction_dict[lang] *= (
-                    self._language_model_dict[lang][token] /
-                    self._language_model_dict[lang].token_count)
+                prediction_dict[lang] += math.log(
+                    self._language_model_dict[lang][token])
         
-        result = max(prediction_dict.keys(), key=(
-            lambda lang: prediction_dict[lang]))
 
-        if prediction_dict[result] == 0:
-            return 'other'
+        # [(lang1, 0.01), (lang2, 0.005), ...]
+        pred = list(map(
+            lambda lang: (
+                lang, prediction_dict[lang] /
+                self._language_model_dict[lang].token_count
+            ), prediction_dict.keys()))
 
-        return result
+        # Get the Highest prediction
+        result = max(pred, key=(lambda x: x[1]))
 
+        # Unknown language when probability is 0
+        if result[1] == 0:
+            predicted_language = 'other'
+        else:
+            predicted_language = result[0]
+
+        #print(sentence)
+        #print(LanguagePredictor.prediction_index, predicted_language, pred)
+
+        # simple counter for debugging purpose
+        LanguagePredictor.prediction_index+=1
+        return predicted_language
 
 class LanguageModel(object):
     """
-    an abstraction of a language dictionary.
+    language model is an abstraction of a language dictionary.
     The dictionary will contains:
     - <token> as the key
     - <count> as the value
@@ -115,12 +139,14 @@ class LanguageModel(object):
         self.tokenizer = tokenizer
         self.smooth_value = 0
 
-    def learn(self, sentence):
+    def train(self, sentence):
+        """Tokenize and add each token into the dictionary counter"""
         for token in self.tokenizer.tokenize(sentence):
             self[token] += 1
             self.token_count += 1
 
     def smoothing(self, value=0):
+        """increase the whole dictionary counter by value"""
         self.smooth_value = value
         for token in self._dict.keys():
             self[token]+=value
@@ -136,10 +162,12 @@ class LanguageModel(object):
         self._dict[token] = value
         
     def __repr__(self):
+        """Debugging message"""
+        data = pprint.pformat(self._dict, indent=2)
         return "{data} - total: {total}".format(
-                data=self._dict, total=self.token_count)
+                data=data, total=self.token_count)
 
-def build_LM(input_file_b, tokenizer):
+def build_LM(input_file_b, tokenizer=CharacterTokenizer(ngram=4)):
     """
     build language models for each label
     each line in in_file contains a label
@@ -147,12 +175,12 @@ def build_LM(input_file_b, tokenizer):
 
     return dictionary with the following formats:
     {
-        <language>: <language-model>,
-        <language>: <language-model>,
-        <language>: <language-model>,
+        <language-A>: <language-model>,
+        <language-B>: <language-model>,
+        <language-C>: <language-model>,
     }
     """
-    print('building language models...')
+    print('Training language models...')
 
     with open(input_file_b) as f:
         sample_data = f.readlines()
@@ -164,35 +192,47 @@ def build_LM(input_file_b, tokenizer):
         if language not in language_models:
             language_models[language] = LanguageModel(language, tokenizer)
 
-        language_models[language].learn(sentence)
+        language_models[language].train(sentence)
 
     for lang, language_model in language_models.items():
         language_model.smoothing(1)
 
     return language_models
 
+def test_LM(in_file, out_file, lm, tokenizer=CharacterTokenizer(ngram=4)):
+    """
+    predict the language of each in_file lines.
+    """
+    print("Predicting language...")
+    predictor = LanguagePredictor(lm, tokenizer)
 
-def main(input_file_b, input_file_t, output_file):
-    tokenizer = CharacterTokenizer(ngram=4)
-    language_models = build_LM(input_file_b, tokenizer)
-    predictor = LanguagePredictor(language_models, tokenizer)
-
-    with open(input_file_t) as f:
+    # Read test file into test_data
+    with open(in_file) as f:
         test_data = f.readlines()
 
+    # Predict the language of test_data
     result = []
     for line in test_data:
         result.append(predictor.predict(line))
 
-    with open(output_file, 'w') as f:
+    # Save the predicted test_data languages
+    with open(out_file, 'w') as f:
         for i in range(len(test_data)):
             f.write("{predicted} {sentence}".format(**{
-                'predicted':result[i],
+                'predicted': result[i],
                 'sentence': test_data[i],
             }))
 
+def main(input_file_b, input_file_t, output_file):
+    """Train and Predict the language"""
+    tokenizer = CharacterTokenizer(ngram=4)
+    # tokenizer = WordTokenizer()
+    language_models = build_LM(input_file_b, tokenizer)
+    test_LM(input_file_t, output_file, language_models, tokenizer)
+
     
 def getCommandArgs():
+    """Handling arguments for the command line"""
     parser = argparse.ArgumentParser(description='Detect Language')
     parser.add_argument('-b', metavar='input-file-for-building-LM',
             type=str, help='input file for building the language model',

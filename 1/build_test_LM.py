@@ -93,17 +93,25 @@ class LanguagePredictor(object):
             prediction_dict[lang] = 0
 
         # For each token, it will sum the total count
-        for token in self.tokenizer.tokenize(sentence):
-            for lang in self._language_model_dict.keys():
-                prediction_dict[lang] += math.log(
-                    self._language_model_dict[lang][token])
+        for lang in self._language_model_dict.keys():
+            tokens = self.tokenizer.tokenize(sentence)
+
+            # Do the computation in log because of the small floating point
+            prediction_dict[lang] = math.fsum(
+                math.log(self._language_model_dict[lang][token])
+                for token in tokens)
+
+            prediction_dict[lang] -= sum([
+                    math.log(self._language_model_dict[lang].token_count)
+                ] * len(tokens))
+
         
 
         # [(lang1, 0.01), (lang2, 0.005), ...]
         pred = list(map(
             lambda lang: (
-                lang, prediction_dict[lang] /
-                self._language_model_dict[lang].token_count
+                lang, 
+                prediction_dict[lang]
             ), prediction_dict.keys()))
 
         # Get the Highest prediction
@@ -164,8 +172,8 @@ class LanguageModel(object):
     def __repr__(self):
         """Debugging message"""
         data = pprint.pformat(self._dict, indent=2)
-        return "{data} - total: {total}".format(
-                data=data, total=self.token_count)
+        return "{language} - total: {total}".format(
+                language=self.language, total=self.token_count)
 
 def build_LM(input_file_b, tokenizer=CharacterTokenizer(ngram=4)):
     """
@@ -194,8 +202,12 @@ def build_LM(input_file_b, tokenizer=CharacterTokenizer(ngram=4)):
 
         language_models[language].train(sentence)
 
+    # Smoothing
     for lang, language_model in language_models.items():
         language_model.smoothing(1)
+
+    # Print total tokens
+    #pprint.pprint(language_models)
 
     return language_models
 

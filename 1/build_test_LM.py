@@ -8,26 +8,6 @@ import pprint
 import math
 
 
-"""
-
-Language Model Data Structure:
-    - _dictionary: 
-        {
-            <token-1>: <count>
-            <token-2>: <count>
-            <token-3>: <count>
-            <token-4>: <count>
-        }
-    - token_count
-
-3 language model object:
-    - malay language model
-    - indonesia language model
-    - tamil language model
-
-
-"""
-
 class Tokenizer(object):
     """Base class for all tokenizer type,
     Any child class must implement tokenize method
@@ -148,6 +128,19 @@ class LanguageModel(object):
 
     aside from the dictionary, the language model also 
     track the sum count of all token.
+
+    i.e.:
+
+    Language Model Data Structure:
+    - _dictionary: 
+        {
+            <token-1>: <count>
+            <token-2>: <count>
+            <token-3>: <count>
+            <token-4>: <count>
+        }
+    - token_count
+
     """
     def __init__(self, language, tokenizer):
         self._dict = {}
@@ -196,6 +189,7 @@ def build_LM(input_file_b, tokenizer=CharacterTokenizer(ngram=4)):
         <language-B>: <language-model>,
         <language-C>: <language-model>,
     }
+    
     """
     print('Training language models...')
 

@@ -16,7 +16,28 @@ class SkipList(collections.abc.MutableSet, collections.abc.Sequence):
             yield element
 
     def __or__(self, l2):
-        return list(set(self._data) | set(l2))
+        result = []
+        p1, p2 = iter(self), iter(l2)
+        cur_p1, cur_p2 = next(p1, None), next(p2, None)
+
+        while cur_p1 is not None or cur_p2 is not None:
+            if cur_p1 is None:
+                result+=[cur_p2]
+                cur_p2 = next(p2, None)
+            elif cur_p2 is None:
+                result+=[cur_p1]
+                cur_p1 = next(p1, None)
+            elif cur_p1 < cur_p2:
+                result+=[cur_p1]
+                cur_p1 = next(p1, None)
+            elif cur_p1 > cur_p2:
+                result+=[cur_p2]
+                cur_p2 = next(p2, None)
+            else:
+                result+=[cur_p1]
+                cur_p1 = next(p1, None)
+                cur_p2 = next(p2, None)
+        return SkipList(result)
 
     def __and__(self, l2):
         result = []

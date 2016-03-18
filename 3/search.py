@@ -64,8 +64,8 @@ class SearchEngine(object):
                 term_doc_id, term_doc_weight = doc
                 scores[term_doc_id] += term_doc_weight * term_query_weight
 
-        normalized_scores = {score/math.sqrt(self.doc_length[doc]
-            for doc, score in score.items}
+        normalized_scores = {doc:score/math.sqrt(self.doc_length[doc])
+            for doc, score in scores.items()}
 
         sorted_scores = sorted(normalized_scores.items(), 
                 key=lambda x: x[1], reverse=True)
